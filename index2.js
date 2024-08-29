@@ -1,12 +1,12 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { updateJSONData,handleFileError}  = require('./userComponent/handler')
-
+const { updateJSONData, handleFileError, readFile } = require('./userComponent/handler')
+const { updateClassJSONData } = require('./classesComponent/classHandler')
 const PORT = 8000;
 
 const FILE_PATH = path.join(__dirname, 'example.json');
-
+const CLASSES_FILE_PATH = path.join(__dirname, 'class.json');
 
 const server = http.createServer((req, res) => {
     console.log(`Received request: ${req.method} ${req.url}`); // Debugging log
@@ -19,7 +19,33 @@ const server = http.createServer((req, res) => {
             }
             res.statusCode = 200;
             res.setHeader('Content-Type', 'application/json');
-            res.end(data);
+            // res.end(data);
+
+            let newdata = JSON.parse(data)
+            // console.log();
+            function loadData(data) {
+                console.log(data);
+               res.end(JSON.stringify(data))
+            }
+
+            readFile(CLASSES_FILE_PATH, (jsonArray) => {
+
+                const classMap = new Map(jsonArray.map(cls => [cls.classId, cls]));
+
+                const updatedData = newdata.map(user => {
+                    const classDetails = classMap.get(user.classId);
+
+
+                    return {
+                        ...user,
+                        classId: classDetails ? classDetails : user.classId
+                    };
+                });
+
+                loadData(updatedData)
+
+            })
+
         });
     } else if (req.method === 'POST' && req.url === '/create') {
         let body = '';
@@ -30,18 +56,18 @@ const server = http.createServer((req, res) => {
         req.on('end', () => {
             try {
                 const parsedBody = JSON.parse(body);
-                const { username, age,classId,className } = parsedBody;
+                const { username, age, classId } = parsedBody;
 
-                if (!username ) {
+                if (!username) {
                     res.statusCode = 400;
                     res.end('Missing username or id');
                     return;
                 }
-               
+
 
                 updateJSONData(FILE_PATH, (jsonArray) => {
                     const newId = jsonArray.length ? jsonArray[jsonArray.length - 1].id + 1 : 1;
-                    jsonArray.push({ username, id:newId, age ,classId});
+                    jsonArray.push({ username, id: newId, age, classId : null });
                 }, res);
 
 
@@ -61,7 +87,7 @@ const server = http.createServer((req, res) => {
         req.on('end', () => {
             try {
                 const parsedBody = JSON.parse(body);
-                const { id, username, age,classId } = parsedBody;
+                const { id, username, age, classId } = parsedBody;
 
                 if (id === undefined) {
                     res.statusCode = 400;
@@ -77,7 +103,7 @@ const server = http.createServer((req, res) => {
                         return;
                     }
 
-                    jsonArray[index] = { ...jsonArray[index], username, age ,classId};
+                    jsonArray[index] = { ...jsonArray[index], username, age, classId };
                 }, res);
             } catch (e) {
                 console.error('Error parsing JSON:', e.message);
